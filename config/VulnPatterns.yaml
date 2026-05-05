@@ -1,0 +1,539 @@
+# VulnPatterns.yaml — claude_secure_coder rule set
+#
+# Loaded by hooks/lib/vuln-patterns-core.ts (sole consumer). Format is a
+# deliberately tight subset of YAML:
+#   secrets:        list of {id, pattern, severity, action, [description], [cwe]}
+#   dangerous_apis: map of language -> list of rules
+#   weak_crypto:    list of rules
+#
+# Severity values: CRITICAL, HIGH, MEDIUM, LOW
+# Action values:   deny (hard block) or alert (advisory)
+# Pattern strings are PCRE-compatible regexes evaluated with the global flag.
+# Use double-backslash to escape inside double-quoted strings.
+
+secrets:
+  - id: anthropic_api_key
+    pattern: "sk-ant-(?:api03-)?[A-Za-z0-9_-]{32,}"
+    severity: CRITICAL
+    action: deny
+    description: "Anthropic API key literal"
+    cwe: "CWE-798"
+
+  - id: openai_api_key_legacy
+    pattern: "sk-[A-Za-z0-9]{48}"
+    severity: CRITICAL
+    action: deny
+    description: "OpenAI API key (legacy 51-char form)"
+    cwe: "CWE-798"
+
+  - id: openai_project_key
+    pattern: "sk-proj-[A-Za-z0-9_-]{40,}"
+    severity: CRITICAL
+    action: deny
+    description: "OpenAI project-scoped key"
+    cwe: "CWE-798"
+
+  - id: openai_org_key
+    pattern: "sk-(?:org|svcacct)-[A-Za-z0-9_-]{20,}"
+    severity: CRITICAL
+    action: deny
+    description: "OpenAI organisation or service-account key"
+    cwe: "CWE-798"
+
+  - id: aws_access_key
+    pattern: "AKIA[0-9A-Z]{16}"
+    severity: CRITICAL
+    action: deny
+    description: "AWS access key ID"
+    cwe: "CWE-798"
+
+  - id: aws_session_key
+    pattern: "ASIA[0-9A-Z]{16}"
+    severity: CRITICAL
+    action: deny
+    description: "AWS session key ID"
+    cwe: "CWE-798"
+
+  - id: aws_secret_access_key
+    pattern: "(?i)aws(.{0,20})?(secret|access).{0,20}?[\"'=:\\s]+([A-Za-z0-9/+=]{40})"
+    severity: CRITICAL
+    action: deny
+    description: "AWS secret access key in literal context"
+    cwe: "CWE-798"
+
+  - id: stripe_live_key
+    pattern: "sk_live_[A-Za-z0-9]{24,}"
+    severity: CRITICAL
+    action: deny
+    description: "Stripe live secret key"
+    cwe: "CWE-798"
+
+  - id: stripe_test_key
+    pattern: "sk_test_[A-Za-z0-9]{24,}"
+    severity: HIGH
+    action: deny
+    description: "Stripe test secret key"
+    cwe: "CWE-798"
+
+  - id: stripe_restricted_key
+    pattern: "rk_(?:live|test)_[A-Za-z0-9]{24,}"
+    severity: CRITICAL
+    action: deny
+    description: "Stripe restricted key"
+    cwe: "CWE-798"
+
+  - id: stripe_publishable_live
+    pattern: "pk_live_[A-Za-z0-9]{24,}"
+    severity: MEDIUM
+    action: alert
+    description: "Stripe live publishable key (low-risk; advisory)"
+    cwe: "CWE-200"
+
+  - id: stripe_webhook_secret
+    pattern: "whsec_[A-Za-z0-9]{32,}"
+    severity: CRITICAL
+    action: deny
+    description: "Stripe webhook signing secret"
+    cwe: "CWE-798"
+
+  - id: github_pat_classic
+    pattern: "ghp_[A-Za-z0-9]{36,}"
+    severity: CRITICAL
+    action: deny
+    description: "GitHub classic personal access token"
+    cwe: "CWE-798"
+
+  - id: github_pat_finegrained
+    pattern: "github_pat_[A-Za-z0-9_]{60,}"
+    severity: CRITICAL
+    action: deny
+    description: "GitHub fine-grained personal access token"
+    cwe: "CWE-798"
+
+  - id: github_oauth_token
+    pattern: "gho_[A-Za-z0-9]{36,}"
+    severity: CRITICAL
+    action: deny
+    description: "GitHub OAuth access token"
+    cwe: "CWE-798"
+
+  - id: github_user_to_server_token
+    pattern: "ghu_[A-Za-z0-9]{36,}"
+    severity: CRITICAL
+    action: deny
+    description: "GitHub user-to-server token"
+    cwe: "CWE-798"
+
+  - id: github_server_to_server_token
+    pattern: "ghs_[A-Za-z0-9]{36,}"
+    severity: CRITICAL
+    action: deny
+    description: "GitHub server-to-server token"
+    cwe: "CWE-798"
+
+  - id: github_refresh_token
+    pattern: "ghr_[A-Za-z0-9]{36,}"
+    severity: CRITICAL
+    action: deny
+    description: "GitHub refresh token"
+    cwe: "CWE-798"
+
+  - id: slack_bot_token
+    pattern: "xoxb-[0-9]{10,}-[0-9]{10,}-[A-Za-z0-9]{20,}"
+    severity: CRITICAL
+    action: deny
+    description: "Slack bot token"
+    cwe: "CWE-798"
+
+  - id: slack_user_token
+    pattern: "xoxp-[0-9]{10,}-[0-9]{10,}-[0-9]{10,}-[A-Za-z0-9]{20,}"
+    severity: CRITICAL
+    action: deny
+    description: "Slack user token"
+    cwe: "CWE-798"
+
+  - id: slack_app_token
+    pattern: "xapp-[0-9]+-[A-Z0-9]+-[0-9]+-[A-Za-z0-9]+"
+    severity: CRITICAL
+    action: deny
+    description: "Slack app-level token"
+    cwe: "CWE-798"
+
+  - id: slack_refresh_token
+    pattern: "xoxe-[0-9]+-[0-9]+-[A-Za-z0-9-]+"
+    severity: CRITICAL
+    action: deny
+    description: "Slack refresh token"
+    cwe: "CWE-798"
+
+  - id: private_key_block_rsa
+    pattern: "-----BEGIN RSA PRIVATE KEY-----"
+    severity: CRITICAL
+    action: deny
+    description: "PEM-encoded RSA private key"
+    cwe: "CWE-798"
+
+  - id: private_key_block_ec
+    pattern: "-----BEGIN EC PRIVATE KEY-----"
+    severity: CRITICAL
+    action: deny
+    description: "PEM-encoded EC private key"
+    cwe: "CWE-798"
+
+  - id: private_key_block_dsa
+    pattern: "-----BEGIN DSA PRIVATE KEY-----"
+    severity: CRITICAL
+    action: deny
+    description: "PEM-encoded DSA private key"
+    cwe: "CWE-798"
+
+  - id: private_key_block_openssh
+    pattern: "-----BEGIN OPENSSH PRIVATE KEY-----"
+    severity: CRITICAL
+    action: deny
+    description: "OpenSSH private key block"
+    cwe: "CWE-798"
+
+  - id: private_key_block_pgp
+    pattern: "-----BEGIN PGP PRIVATE KEY BLOCK-----"
+    severity: CRITICAL
+    action: deny
+    description: "PGP private key block"
+    cwe: "CWE-798"
+
+  - id: private_key_block_generic
+    pattern: "-----BEGIN PRIVATE KEY-----"
+    severity: CRITICAL
+    action: deny
+    description: "PKCS#8 private key block"
+    cwe: "CWE-798"
+
+  - id: db_url_postgres
+    pattern: "postgres(?:ql)?(?:\\+[a-z]+)?://[^\\s:@/]+:[^\\s:@/]+@[^\\s/]+"
+    severity: CRITICAL
+    action: deny
+    description: "Postgres connection URL with embedded password"
+    cwe: "CWE-798"
+
+  - id: db_url_mysql
+    pattern: "mysql(?:\\+[a-z]+)?://[^\\s:@/]+:[^\\s:@/]+@[^\\s/]+"
+    severity: CRITICAL
+    action: deny
+    description: "MySQL connection URL with embedded password"
+    cwe: "CWE-798"
+
+  - id: db_url_mongodb
+    pattern: "mongodb(?:\\+srv)?://[^\\s:@/]+:[^\\s:@/]+@[^\\s/]+"
+    severity: CRITICAL
+    action: deny
+    description: "MongoDB connection URL with embedded password"
+    cwe: "CWE-798"
+
+  - id: jwt_signing_secret_literal
+    pattern: "(?i)(?:jwt|jwt[_-]?secret|jwt[_-]?signing[_-]?key|jwt[_-]?key)\\s*[:=]\\s*[\"'][A-Za-z0-9_./+=-]{16,}[\"']"
+    severity: HIGH
+    action: deny
+    description: "JWT signing secret hard-coded in source"
+    cwe: "CWE-798"
+
+  - id: generic_password_assignment
+    pattern: "(?i)(?:password|passwd|pwd)\\s*[:=]\\s*[\"'][^\"'\\s]{8,}[\"']"
+    severity: HIGH
+    action: alert
+    description: "Likely hard-coded password — verify it is a placeholder before merging"
+    cwe: "CWE-798"
+
+dangerous_apis:
+  typescript:
+    - id: ts_eval_call
+      pattern: "\\beval\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "Direct eval() — arbitrary code execution risk"
+      cwe: "CWE-95"
+
+    - id: ts_function_constructor
+      pattern: "\\bnew\\s+Function\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "Function constructor — arbitrary code execution risk"
+      cwe: "CWE-95"
+
+    - id: ts_settimeout_string
+      pattern: "set(?:Timeout|Interval)\\s*\\(\\s*[\"']"
+      severity: HIGH
+      action: alert
+      description: "setTimeout/setInterval with a string body — implicit eval"
+      cwe: "CWE-95"
+
+    - id: ts_child_process_exec
+      pattern: "(?:child_process|cp)\\.exec\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "child_process.exec — shell-injectable; prefer execFile"
+      cwe: "CWE-78"
+
+    - id: ts_child_process_exec_sync
+      pattern: "(?:child_process|cp)\\.execSync\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "child_process.execSync — shell-injectable; prefer execFileSync"
+      cwe: "CWE-78"
+
+    - id: ts_vm_run_in_this_context
+      pattern: "vm\\.runInThisContext\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "vm.runInThisContext — code execution in current scope"
+      cwe: "CWE-95"
+
+    - id: ts_vm_run_in_new_context
+      pattern: "vm\\.runInNewContext\\s*\\("
+      severity: MEDIUM
+      action: alert
+      description: "vm.runInNewContext — sandboxed code exec; verify input is trusted"
+      cwe: "CWE-95"
+
+    - id: ts_dangerously_set_inner_html
+      pattern: "dangerouslySetInnerHTML"
+      severity: HIGH
+      action: alert
+      description: "React dangerouslySetInnerHTML — XSS sink unless input is sanitised"
+      cwe: "CWE-79"
+
+  python:
+    - id: py_eval_call
+      pattern: "(?<![A-Za-z0-9_.])eval\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "Python eval() — arbitrary code execution risk"
+      cwe: "CWE-95"
+
+    - id: py_exec_call
+      pattern: "(?<![A-Za-z0-9_.])exec\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "Python exec() — arbitrary code execution risk"
+      cwe: "CWE-95"
+
+    - id: py_pickle_loads
+      pattern: "pickle\\.loads\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "pickle.loads on untrusted data — arbitrary code execution"
+      cwe: "CWE-502"
+
+    - id: py_pickle_load
+      pattern: "pickle\\.load\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "pickle.load on untrusted file — arbitrary code execution"
+      cwe: "CWE-502"
+
+    - id: py_cpickle_loads
+      pattern: "cPickle\\.loads\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "cPickle.loads — arbitrary code execution"
+      cwe: "CWE-502"
+
+    - id: py_subprocess_shell_true
+      pattern: "subprocess\\.[A-Za-z_]+\\([^\\)]*shell\\s*=\\s*True"
+      severity: HIGH
+      action: alert
+      description: "subprocess with shell=True — shell-injectable"
+      cwe: "CWE-78"
+
+    - id: py_os_system
+      pattern: "(?<![A-Za-z0-9_.])os\\.system\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "os.system — shell-injectable; prefer subprocess with a list arg"
+      cwe: "CWE-78"
+
+    - id: py_os_popen
+      pattern: "(?<![A-Za-z0-9_.])os\\.popen\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "os.popen — shell-injectable"
+      cwe: "CWE-78"
+
+    - id: py_yaml_load_unsafe
+      pattern: "yaml\\.load\\s*\\((?![^\\)]*(?:SafeLoader|CSafeLoader|Loader\\s*=\\s*yaml\\.SafeLoader))"
+      severity: HIGH
+      action: alert
+      description: "yaml.load without SafeLoader — arbitrary object construction"
+      cwe: "CWE-502"
+
+    - id: py_marshal_loads
+      pattern: "marshal\\.loads\\s*\\("
+      severity: HIGH
+      action: alert
+      description: "marshal.loads on untrusted data — arbitrary code execution"
+      cwe: "CWE-502"
+
+    - id: py_shelve_open
+      pattern: "shelve\\.open\\s*\\("
+      severity: MEDIUM
+      action: alert
+      description: "shelve.open uses pickle internally — risky on untrusted files"
+      cwe: "CWE-502"
+
+  bash:
+    - id: bash_eval
+      pattern: "(^|[\\s;&|`(])eval\\s+"
+      severity: HIGH
+      action: alert
+      description: "Shell eval — arbitrary command execution"
+      cwe: "CWE-78"
+
+    - id: bash_dash_c_double_quoted_var
+      pattern: "(?:bash|sh|zsh)\\s+-c\\s+\"[^\"]*\\$"
+      severity: HIGH
+      action: alert
+      description: "shell -c with double-quoted string containing variable expansion"
+      cwe: "CWE-78"
+
+    - id: bash_unquoted_command_var
+      pattern: "(^|[\\n;&|])\\s*\\$[A-Za-z_][A-Za-z0-9_]*(\\s|$)"
+      severity: MEDIUM
+      action: alert
+      description: "Unquoted variable used as command — vulnerable to word splitting"
+      cwe: "CWE-78"
+
+    - id: bash_curl_pipe_to_shell
+      pattern: "curl[^|]*\\|\\s*(?:bash|sh|zsh)"
+      severity: HIGH
+      action: alert
+      description: "curl piped directly to shell — code execution from network"
+      cwe: "CWE-494"
+
+    - id: bash_wget_pipe_to_shell
+      pattern: "wget[^|]*\\|\\s*(?:bash|sh|zsh)"
+      severity: HIGH
+      action: alert
+      description: "wget piped directly to shell — code execution from network"
+      cwe: "CWE-494"
+
+  sql:
+    - id: sql_select_concat
+      pattern: "(?is)\\bSELECT\\b[^;]{0,200}(?:\\+\\s*[\"'`]|\\|\\|\\s*[\"'`]|format\\s*\\(|f[\"'`])"
+      severity: HIGH
+      action: alert
+      description: "SELECT statement near string concatenation/format — SQLi risk"
+      cwe: "CWE-89"
+
+    - id: sql_insert_concat
+      pattern: "(?is)\\bINSERT\\s+INTO\\b[^;]{0,200}(?:\\+\\s*[\"'`]|\\|\\|\\s*[\"'`]|format\\s*\\(|f[\"'`])"
+      severity: HIGH
+      action: alert
+      description: "INSERT statement near string concatenation/format — SQLi risk"
+      cwe: "CWE-89"
+
+    - id: sql_update_concat
+      pattern: "(?is)\\bUPDATE\\b[^;]{0,200}(?:\\+\\s*[\"'`]|\\|\\|\\s*[\"'`]|format\\s*\\(|f[\"'`])"
+      severity: HIGH
+      action: alert
+      description: "UPDATE statement near string concatenation/format — SQLi risk"
+      cwe: "CWE-89"
+
+    - id: sql_delete_concat
+      pattern: "(?is)\\bDELETE\\s+FROM\\b[^;]{0,200}(?:\\+\\s*[\"'`]|\\|\\|\\s*[\"'`]|format\\s*\\(|f[\"'`])"
+      severity: HIGH
+      action: alert
+      description: "DELETE statement near string concatenation/format — SQLi risk"
+      cwe: "CWE-89"
+
+  generic: []
+
+weak_crypto:
+  - id: md5_password_call
+    pattern: "(?i)md5\\s*\\([^)]*(?:password|passwd|pwd|secret)[^)]*\\)"
+    severity: MEDIUM
+    action: alert
+    description: "MD5 used near password material — broken for password hashing"
+    cwe: "CWE-327"
+
+  - id: sha1_password_call
+    pattern: "(?i)sha1\\s*\\([^)]*(?:password|passwd|pwd|secret)[^)]*\\)"
+    severity: MEDIUM
+    action: alert
+    description: "SHA-1 used near password material — broken for password hashing"
+    cwe: "CWE-327"
+
+  - id: hashlib_md5_password
+    pattern: "(?i)hashlib\\.md5\\s*\\([^)]*(?:password|passwd|pwd|secret)[^)]*\\)"
+    severity: MEDIUM
+    action: alert
+    description: "hashlib.md5 used near password material — use bcrypt/argon2/scrypt"
+    cwe: "CWE-327"
+
+  - id: hashlib_sha1_password
+    pattern: "(?i)hashlib\\.sha1\\s*\\([^)]*(?:password|passwd|pwd|secret)[^)]*\\)"
+    severity: MEDIUM
+    action: alert
+    description: "hashlib.sha1 used near password material — use bcrypt/argon2/scrypt"
+    cwe: "CWE-327"
+
+  - id: cipher_des
+    pattern: "(?i)\\b(?:DES-(?:EDE3?|CBC|ECB)|3DES|TripleDES|DES_CBC|DES_ECB)\\b"
+    severity: MEDIUM
+    action: alert
+    description: "DES/3DES reference — deprecated cipher; prefer AES-GCM"
+    cwe: "CWE-327"
+
+  - id: cipher_rc4
+    pattern: "(?i)\\b(?:RC4|ARC4|ARCFOUR)\\b"
+    severity: MEDIUM
+    action: alert
+    description: "RC4 reference — broken stream cipher"
+    cwe: "CWE-327"
+
+  - id: cipher_ecb_mode
+    pattern: "(?i)(?:AES|DES)[-_/.]?ECB"
+    severity: MEDIUM
+    action: alert
+    description: "ECB mode reference — leaks plaintext patterns; use GCM/CBC+HMAC"
+    cwe: "CWE-327"
+
+  - id: cipher_blowfish
+    pattern: "(?i)\\bBlowfish\\b"
+    severity: LOW
+    action: alert
+    description: "Blowfish reference — small block size; prefer AES"
+    cwe: "CWE-327"
+
+  - id: js_math_random_security
+    pattern: "(?i)Math\\.random\\s*\\([^)]*\\)[^;\\n]{0,80}(?:token|secret|password|nonce|otp|salt|csrf|sessionid|session_id|api[_-]?key)"
+    severity: MEDIUM
+    action: alert
+    description: "Math.random used near security token — non-CSPRNG"
+    cwe: "CWE-338"
+
+  - id: js_math_random_security_reverse
+    pattern: "(?i)(?:token|secret|password|nonce|otp|salt|csrf|sessionid|session_id|api[_-]?key)[^;\\n]{0,80}Math\\.random\\s*\\("
+    severity: MEDIUM
+    action: alert
+    description: "Math.random used near security token — non-CSPRNG"
+    cwe: "CWE-338"
+
+  - id: py_random_random_security
+    pattern: "(?i)random\\.random\\s*\\([^)]*\\)[^;\\n]{0,80}(?:token|secret|password|nonce|otp|salt|csrf|session)"
+    severity: MEDIUM
+    action: alert
+    description: "random.random used near security token — use secrets module"
+    cwe: "CWE-338"
+
+  - id: py_random_random_security_reverse
+    pattern: "(?i)(?:token|secret|password|nonce|otp|salt|csrf|session)[^;\\n]{0,80}random\\.random\\s*\\("
+    severity: MEDIUM
+    action: alert
+    description: "random.random used near security token — use secrets module"
+    cwe: "CWE-338"
+
+  - id: py_random_choice_security
+    pattern: "(?i)random\\.(?:choice|choices|randint|randrange)\\s*\\([^)]*\\)[^;\\n]{0,80}(?:token|secret|password|nonce|otp|salt|csrf|session)"
+    severity: MEDIUM
+    action: alert
+    description: "random.choice/randint used near security token — use secrets module"
+    cwe: "CWE-338"

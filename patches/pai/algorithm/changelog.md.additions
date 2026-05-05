@@ -1,0 +1,58 @@
+# changelog.md — additions for Algorithm v6.4.0
+
+Prepend the following entry to `~/.claude/PAI/ALGORITHM/changelog.md` under the **Index → Current** section, above the existing v6.3.0 entry. Also add a corresponding "v6.3.0 → v6.4.0" section under "Full History" (text below).
+
+---
+
+## Index entry (prepend in Current section)
+
+```markdown
+- **v6.4.0** (2026-05-05) — **Shift-left security release.** Field problem: across v6.3.0 and earlier, security entered the Algorithm only at VERIFY (Silas, Cato, RedTeam, security-review skill, pr-review-toolkit). Reactive review caught vulnerabilities after they were already written, when fixes are 10-100x more expensive than at design or write time. Mature security organizations work the other way: teach secure-coding patterns up front, get IDE-level feedback while writing, and post-hoc review catches only residual issues. v6.4.0 inverts the layering. (1) **SessionStart context injection** via `claude_secure_coder` SecureCodingContext.hook.ts — loads OWASP Top 10:2025, CWE Top 25, OWASP AST10 (2026), and per-language secure-coding rules into every session before the first prompt. (2) **PLAN-phase threat modeling** via new `ThreatModel` skill (STRIDE for traditional apps, MAESTRO for agentic AI per CSA Feb 2025) — auto-included for E3+ coding tasks. Silas additionally auto-included at PLAN for E4+ ("identify attack surface before we build" instead of only "find what we missed"). (3) **EXECUTE-phase IDE-style feedback** via two hooks — PreToolUse `VulnPatternHook` (fast deterministic, hard-blocks on literal secret detection, advises on dangerous APIs and weak crypto) and PostToolUse `SAST` hook (semgrep + trufflehog + gitleaks with regenerate-loop on HIGH severity, max 2 iterations per file). Pattern matches Anthropic's own Semgrep plugin (PostToolUse + regenerate-loop), Phoenix Security's open kit, and OWASP shift-left consensus 2025-2026. (4) **OBSERVE-phase security ISC scaffolding** — when the task is coding-shaped, Scaffold workflow auto-generates security-category ISCs (input validation, authn, authz, secrets, crypto, deserialization, dependency hygiene, rate limiting, logging) keyed to OWASP / CWE / AST10. Soft floor of 6 security ISCs at E3, 12 at E4, 24 at E5. (5) **Closed thinking-capability enumeration** grew from 19 to 20 with addition of **ThreatModel**. Existing v6.3.0 review tooling (Silas at VERIFY, Cato, RedTeam, security-review, pr-review-toolkit) preserved unchanged — they are now the backstop layer, not the primary defense. C/R/L: conjectured: security review at VERIFY catches vulnerabilities cheaply enough that earlier-phase intervention isn't needed. refuted_by: empirical evidence across 2025 industry data and {{PRINCIPAL_NAME}}'s own engineering experience — VERIFY-phase fixes routinely require redesign of work already shipped, costing 10-100x what design-time prevention would have cost; the ratio gets worse as projects accumulate technical debt. learned: security must be a layered cross-phase concern (SessionStart → OBSERVE → PLAN → EXECUTE → VERIFY) with each layer compensating for what the previous one misses. The same pattern Anthropic already adopted internally with the Semgrep plugin (PostToolUse + regenerate-loop) generalizes to a four-layer stack: teach + design + write + review. criterion_now: every E3+ coding task in v6.4.0 produces threat-modeled ISCs at PLAN, every Edit/Write fires both PreToolUse and PostToolUse security hooks at EXECUTE, every session loads OWASP/CWE/AST10 context at SessionStart. Migration: install the `claude_secure_coder` repo (`bash install.sh`), then `bash patches/pai/apply.sh` to apply the PAI integration. The apply script: (a) writes `6.4.0` to `~/.claude/PAI/ALGORITHM/LATEST`, (b) copies `v6.4.0.md` into `~/.claude/PAI/ALGORITHM/`, (c) overlays the additions described in `capabilities.md.additions`, (d) prepends this entry to `changelog.md`, (e) installs `VulnPatternInspector.ts` into `~/.claude/hooks/security/inspectors/` and registers it in `SecurityPipeline.hook.ts`'s inspector chain. Rollback: `echo 6.3.0 > LATEST && rm v6.4.0.md` plus revert the inspector registration. v6.4.x deferred: the Coding-Shaped Detection rules currently rely on user judgment + ISA Scaffold heuristics; future revision moves these into a deterministic classifier hook so the auto-include is non-judgmental. Also deferred: an automated linter that confirms every Edit/Write touched-file is covered by the PreToolUse + PostToolUse pipeline (currently relies on the hook chain firing).
+```
+
+---
+
+## Full History section (append at end of file)
+
+```markdown
+### v6.3.0 → v6.4.0
+
+v6.4.0 ships the `claude_secure_coder` integration — the first cross-phase security release. The doctrine bump preserves all v6.3.0 doctrine verbatim; everything new is additive.
+
+**What's actually new:**
+
+1. **Shift-Left Security Doctrine section** in `v6.4.0.md` — a new top-level section that names the four-layer model (Teach / Design / Write / Review), the per-phase mechanisms, the coding-shaped trigger, and the security-ISC categories with OWASP / CWE / AST10 mappings.
+
+2. **ThreatModel** added to the closed thinking-capability enumeration (was 19 entries → now 20). Counts toward the thinking floor at E2+ when invoked analytically. Auto-included at PLAN for E3+ coding tasks.
+
+3. **Silas at PLAN** binding added — Silas was already in the system as a VERIFY-phase agent; v6.4.0 adds an additional invocation point at PLAN for E4+ coding tasks, for adversarial pre-build attack-surface analysis.
+
+4. **Auto-include bindings table** at OBSERVE → "Select capabilities" gate gains two new rows: ThreatModel (E3+ coding-shaped) and Silas at PLAN (E4+ coding-shaped).
+
+5. **Security ISC categories table** in the doctrine — twelve canonical categories with example ISC text and OWASP/CWE/AST10 cross-reference, intended to seed the ISA `## Criteria` for coding-shaped tasks.
+
+**What's not new (preserved from v6.3.0):**
+
+- Closed enumeration enforcement (Capability-Name Audit Gate) — extends naturally to ThreatModel.
+- Twelve-section ISA frame and tier completeness gate — unchanged.
+- Thinking floor (HARD) and delegation floor (soft) at v6.1.0 numbers — unchanged.
+- ID-stability rule, Reproduce-First gate, Verification Doctrine Rules 1/2/2a/3 — unchanged.
+- Existing review tooling (Silas-at-VERIFY, Cato, RedTeam, security-review, pr-review-toolkit) — unchanged in role, repositioned as backstop.
+
+**Why now:**
+
+The v6.3.0 → v6.4.0 conversation captured what mature security organizations already know: shift-left wins. The catalyst was the user pointing out that the current Algorithm pattern (write → review → fix) inverts the real-world best practice (teach → write securely → IDE feedback → minimal review). v6.4.0 implements that inversion as Algorithm doctrine.
+
+**Rollback recipe:**
+
+```bash
+echo 6.3.0 > ~/.claude/PAI/ALGORITHM/LATEST
+rm ~/.claude/PAI/ALGORITHM/v6.4.0.md
+# revert capabilities.md to its v6.3.0 state (git checkout if tracked)
+# remove this entry from changelog.md
+# remove VulnPatternInspector from SecurityPipeline.hook.ts inspector chain
+# uninstall claude_secure_coder hooks via patches/pai/uninstall.sh (provided)
+```
+
+The hook chain and ISA format are forward-compatible: a v6.3.0 Algorithm runs cleanly even with `claude_secure_coder` hooks installed (they are doctrine-agnostic). Rollback is fully non-destructive.
+```

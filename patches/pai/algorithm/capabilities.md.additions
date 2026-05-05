@@ -1,0 +1,57 @@
+# capabilities.md — additions for Algorithm v6.4.0
+
+This file lists the additions and modifications to be applied to Daniel Miessler's PAI `~/.claude/PAI/ALGORITHM/capabilities.md` to support Algorithm v6.4.0's shift-left security doctrine. Apply via `apply.sh` in this directory, or merge by hand for upstream PR review.
+
+## Addition 1 — ThreatModel row in "Thinking & Analysis Capabilities" table
+
+After the existing `**ISA Skill**` row (the last row in the Thinking & Analysis table), add a new row:
+
+```markdown
+| **ThreatModel** | **PLAN, OBSERVE** | **MANDATORY at PLAN for E3+ coding tasks (any task that modifies code that will run in production OR handles user data OR exposes a network surface). Workflows: STRIDE (traditional apps), MAESTRO (agentic AI per CSA Feb 2025), DataFlowDiagram (trust boundaries), AbuseCases (misuse from user stories), SecurityISCs (deterministic threat→ISC mapping). Output: threat tables and atomic security ISCs ready to drop into the calling ISA's `## Criteria` section. Counts when invoked for design-time analysis, not just for boilerplate threat lists.** | `Skill("ThreatModel", "<workflow> <args>")` | E3+ |
+```
+
+## Addition 2 — New "Security at Design Time" subsection
+
+After the "## Code Quality Capabilities" section and before the "## Delegation & Infrastructure Capabilities" section, insert a new section:
+
+```markdown
+## Security Capabilities (Shift-Left, NEW v6.4.0)
+
+Use these at SessionStart, OBSERVE, PLAN, and EXECUTE — not only at VERIFY. The shift-left layered model: teach (SessionStart context), design (PLAN threat modeling), write (EXECUTE PreToolUse + PostToolUse hooks), review (existing VERIFY tooling as backstop).
+
+| Capability | When | Invoke |
+|------------|------|--------|
+| **claude_secure_coder SessionStart context** | Loaded automatically every session by `SecureCodingContext.hook.ts`. Provides OWASP Top 10:2025, CWE Top 25, OWASP AST10 (2026), per-language secure-coding rules. No manual invocation needed. | (automatic) |
+| **ThreatModel skill** | At PLAN for E3+ coding tasks. STRIDE for traditional apps; MAESTRO for agentic AI; both for hybrid. Produces threat table and atomic ISCs that go into the ISA `## Criteria`. | `Skill("ThreatModel", "STRIDE for <surface>")` |
+| **Silas at PLAN** | At PLAN for E4+ coding tasks (in addition to existing VERIFY presence). Adversarial "identify attack surface before we build" pass. | `Agent(subagent_type="Silas", prompt="...identify attack surface...")` |
+| **VulnPatternHook (PreToolUse)** | Fires automatically on every Edit/Write/MultiEdit. Hard-blocks on literal secret detection. Advises on dangerous APIs (eval/exec/pickle.loads/etc.) and weak crypto. | (automatic) |
+| **PostToolUse SAST hook** | Fires automatically after every Edit/Write/MultiEdit. Runs semgrep + trufflehog + gitleaks (whichever installed) on the file just changed. HIGH severity triggers regenerate-loop (max 2 iterations per file). | (automatic) |
+| **VulnPatternInspector (PAI integration)** | Wraps the same logic as VulnPatternHook into PAI's existing SecurityPipeline.hook.ts inspector chain at priority 70. | (automatic, via SecurityPipeline) |
+
+### Shift-left auto-include binding (E3-E5 coding tasks)
+
+**Trigger:** ISA `effort` is `advanced`, `deep`, or `comprehensive` AND the task is coding-shaped (modifies production code, handles user data, exposes a network surface, manipulates user file system, or implements an AI agent / skill / hook / MCP server).
+
+**Behavior at PLAN:**
+1. Add `ThreatModel` to `🏹 CAPABILITIES SELECTED` with target phase PLAN.
+2. Invoke `Skill("ThreatModel", "STRIDE for <surface>")` (or MAESTRO for agentic), output ISCs append to `## Criteria` via `Skill("ISA", "append criteria ...")`.
+3. At E4/E5: also add Silas with target phase PLAN; spawn `Agent(subagent_type="Silas", ...)` for adversarial pre-build pass.
+
+**Skip when:** task is documentation-only, content authoring, content analysis, or pure research (not coding-shaped). Skip is non-relaxable — if the task is coding-shaped, the threat model runs.
+
+**What this gate prevents:** the v6.3.0 and earlier pattern of writing code first and discovering security issues only at VERIFY, when fixes are 10-100x more expensive than at design time.
+
+### Forge + ThreatModel composition
+
+When BOTH Forge auto-include and ThreatModel auto-include fire (E3+ coding task), the order is:
+1. PLAN: ThreatModel produces security ISCs → appended to `## Criteria`
+2. PLAN: Silas (E4+) adds attack-surface ISCs → appended to `## Criteria`
+3. EXECUTE: Forge implements against the (now security-extended) `## Criteria`
+4. VERIFY: Cato (E4/E5) audits, including the security ISCs
+
+This composition is the v6.4.0 "secure by construction" pipeline: threats become ISCs, ISCs become tests, tests drive Forge's implementation, Cato validates.
+```
+
+## Addition 3 — Updated thinking-capability vocabulary list
+
+In the v6.3.0 closed enumeration that lives in the doctrine file (referenced at the top of capabilities.md, but not part of capabilities.md itself), the vocabulary grew from 19 to 20 entries. The 20th is **ThreatModel**. This is reflected in `v6.4.0.md` directly. No change to capabilities.md is needed for the closed-list itself — it lives in the doctrine file and is the only place the closed list is canonical.

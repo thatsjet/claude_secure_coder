@@ -1,0 +1,37 @@
+{
+  "_comment": "Example registration of claude_secure_coder hooks. install.sh will merge these into your existing ~/.claude/settings.json idempotently. Or copy them in by hand if you prefer manual control.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/csc/SecureCodingContext.hook.ts"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/csc/VulnPatternHook.hook.ts"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/csc/PostToolUseSAST.hook.ts"
+          }
+        ]
+      }
+    ]
+  }
+}
