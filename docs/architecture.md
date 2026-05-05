@@ -69,17 +69,17 @@ After every Edit/Write/MultiEdit, runs whichever of these are installed (in para
 - **trufflehog** (`filesystem --no-update --json --only-verified --no-fail`) — verified live secrets only (low false positive rate), severity CRITICAL
 - **gitleaks** (`detect --source ... --no-git --report-format json --exit-code 0`) — fast secret regex, severity HIGH
 
-Aggregates findings. **Regenerate signal** on HIGH/CRITICAL: returns `additionalContext` with explicit "ACTION: Rewrite this file to fix these findings" so Claude rewrites in the next turn. Bounded at 2 regenerate iterations per file per session.
+Aggregates findings. **Advisory rewrite-guidance** on HIGH/CRITICAL: returns `additionalContext` with explicit "ACTION: Rewrite this file to fix these findings" so Claude is strongly nudged to rewrite in the next turn. Bounded at 2 iterations per file per session. Note: Claude Code's PostToolUse hook protocol does not have a guaranteed `decision: regenerate` type — the additional-context channel is advisory. We rely on Claude reading the structured findings + ACTION line and self-correcting; this is the same pattern Anthropic's published Semgrep plugin uses.
 
 **Per-project ignore:** `<project>/.claude/security/sast-ignore.yaml` filters known false positives.
 
 **Telemetry:** `~/.claude/PAI/MEMORY/OBSERVABILITY/sast-scans.jsonl` (or `os.tmpdir()/claude-sast-scans.jsonl` for non-PAI users).
 
-### Pattern: PreToolUse hard-blocks deterministic, PostToolUse regenerates heuristic
+### Pattern: PreToolUse hard-blocks deterministic, PostToolUse advises rewrite for heuristic
 
 Latency is the gating constraint. PreToolUse must complete fast (under ~1s) because it runs before every Edit/Write — slow PreToolUse freezes the entire agent turn. So PreToolUse only runs deterministic regex matchers (literal API keys, banned imports, weak crypto patterns) where false positives are nearly impossible.
 
-PostToolUse can take longer because it runs after the file is written. Slower SAST tools (semgrep) and verified secret scanners (trufflehog) live there. The regenerate-loop replaces hard-blocking with "rewrite this file to fix the findings" — Claude reads its own diff feedback and self-corrects.
+PostToolUse can take longer because it runs after the file is written. Slower SAST tools (semgrep) and verified secret scanners (trufflehog) live there. The advisory rewrite-guidance loop replaces hard-blocking with "rewrite this file to fix the findings" — Claude reads its own diff feedback and self-corrects.
 
 This pattern is what Anthropic's published Semgrep plugin uses (<https://claude.com/plugins/semgrep>). We adopted it because the alternative (PreToolUse with semgrep) blocks the agent for 2-15 seconds per Edit and frustrates flow.
 
@@ -102,7 +102,7 @@ A typical end-to-end flow on a coding-shaped task (PAI user, E4):
 2. **OBSERVE**: Algorithm v6.4.0 doctrine prompts the ISA scaffold to generate security-category ISCs (input validation, auth, authz, secrets, crypto, deserialization, rate limiting, dependency hygiene).
 3. **PLAN**: ThreatModel skill auto-included. STRIDE workflow runs. Threat table generated. SecurityISCs workflow appends atomic ISCs to the ISA `## Criteria`. At E4+, Silas spawned for adversarial pre-build pass.
 4. **EXECUTE**: Forge generates code. Each Edit/Write triggers VulnPatternHook (PreToolUse, fast). If a literal secret is in the diff, hard-blocked. If `eval(userInput)` is in the diff, advisory feedback is added to context.
-5. **EXECUTE (continued)**: After each Edit/Write succeeds, PostToolUseSAST fires. semgrep + trufflehog scan the file. HIGH-severity finding → regenerate signal → Claude rewrites the file.
+5. **EXECUTE (continued)**: After each Edit/Write succeeds, PostToolUseSAST fires. semgrep + trufflehog scan the file. HIGH-severity finding → advisory rewrite-guidance with structured findings + ACTION line → Claude reads its own diff feedback and rewrites the file (advisory, not protocol-enforced; pattern matches Anthropic's published Semgrep plugin).
 6. **VERIFY**: Existing review tooling (Cato, security-review) verifies the security ISCs. Catches residual issues.
 7. **LEARN**: Telemetry (`sast-scans.jsonl`, `vulnpattern-scans.jsonl`) records what fired. Feedback informs future rule tuning.
 

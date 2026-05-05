@@ -12,7 +12,7 @@ This directory contains the integration between `claude_secure_coder` and Daniel
 4. **Auto-includes `ThreatModel` at PLAN** for E3+ coding-shaped tasks.
 5. **Auto-includes `Silas` at PLAN** for E4+ coding-shaped tasks (in addition to existing VERIFY presence).
 6. **Documents security ISC categories** at OBSERVE — a 12-row table mapping (Input validation, Auth, Authz, Secrets, Crypto, Deserialization, Path/command injection, Rate limiting, Dependency hygiene, Logging, AST agentic) to OWASP/CWE/AST10.
-7. **Wires `VulnPatternInspector` into PAI's `SecurityPipeline.hook.ts`** at priority 70 (between Egress and Rules inspectors).
+7. **(Optional) Wires `VulnPatternInspector` into PAI's `SecurityPipeline.hook.ts`** at priority 70 (between Egress and Rules inspectors). This is **optional** — the portable `VulnPatternHook.hook.ts` is already registered as a standalone PreToolUse hook by `install.sh`, providing identical coverage. The Inspector form is a code-organization preference for PAI users who prefer one inspector chain over two parallel hooks. Skipping this leaves coverage intact. PAI's own PATTERNS.yaml protects `SecurityPipeline.hook.ts` as read-only, so applying this requires the user to lift the protection temporarily; we never bypass it automatically.
 8. **Prepends a v6.4.0 changelog entry** to `~/.claude/PAI/ALGORITHM/changelog.md`.
 
 ## Files in this directory

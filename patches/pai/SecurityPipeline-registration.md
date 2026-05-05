@@ -1,6 +1,13 @@
-# Registering VulnPatternInspector in SecurityPipeline.hook.ts
+# Registering VulnPatternInspector in SecurityPipeline.hook.ts (OPTIONAL)
 
-Daniel Miessler's PAI ships `~/.claude/hooks/SecurityPipeline.hook.ts` with a fixed inspector chain. To add `VulnPatternInspector` (priority 70), apply this small edit by hand. We avoid auto-editing because the upstream file may evolve and an automatic patch would break on the next PAI update.
+> **This step is optional.** The portable `VulnPatternHook.hook.ts` is already registered as a standalone PreToolUse hook by `install.sh`, and provides identical coverage. The Inspector form is a code-organization preference for PAI users who prefer one inspector chain over two parallel hooks. **Skipping this section leaves coverage intact** — your literal-secret denies, dangerous-API advisories, and weak-crypto advisories all fire from `VulnPatternHook.hook.ts` regardless.
+
+Daniel Miessler's PAI ships `~/.claude/hooks/SecurityPipeline.hook.ts` with a fixed inspector chain. To consolidate `VulnPatternInspector` (priority 70) into that chain, apply the small edit below by hand.
+
+**Why this isn't auto-applied:**
+1. PAI's own `PATTERNS.yaml` protects `SecurityPipeline.hook.ts` as a read-only path — modifying it triggers PAI's PatternInspector deny. We never bypass user-set guardrails automatically.
+2. Upstream PAI evolves and an automatic patch could break on the next PAI update.
+3. Inspector form duplicates the standalone hook's coverage; running both is redundant. Pick one.
 
 ## Current chain
 

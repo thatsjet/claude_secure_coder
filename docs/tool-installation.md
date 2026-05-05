@@ -82,7 +82,7 @@ The hook normalizes severities:
 - trufflehog (verified) → CRITICAL
 - gitleaks → HIGH
 
-A regenerate signal triggers when ANY HIGH or CRITICAL finding is reported.
+An advisory rewrite-guidance message is emitted when ANY HIGH or CRITICAL finding is reported. It contains structured findings + an explicit ACTION line nudging Claude to rewrite the file. This is advisory, not protocol-enforced — Claude Code's PostToolUse hook contract does not have a guaranteed `decision: regenerate` type.
 
 ## What if I can't install any of these?
 
@@ -121,4 +121,4 @@ For VulnPatternHook (PreToolUse), edit the rule set directly: `~/.claude/hooks/c
 
 ## Future: MCP integration
 
-Semgrep ships an MCP server (<https://semgrep.dev/docs/mcp>) that exposes scanning as a Claude Code tool. Once stable, this can replace the CLI invocation in PostToolUseSAST. The hook would call the MCP tool and let Claude orchestrate the regenerate-loop.
+Semgrep ships an MCP server (<https://semgrep.dev/docs/mcp>) that exposes scanning as a Claude Code tool. Once stable, this can replace the CLI invocation in PostToolUseSAST. The hook would call the MCP tool and let Claude orchestrate the rewrite loop.
