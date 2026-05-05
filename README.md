@@ -1,4 +1,4 @@
-# claude_secure_coder
+# Claude Secure Coder
 
 Shift-left security tooling for Claude Code. Get Claude doing the secure-coding work **before** code is written, not after — so vulnerabilities are prevented at write time instead of caught at review time.
 
