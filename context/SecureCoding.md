@@ -1,205 +1,98 @@
 # Secure Coding — Constitutional Context
 
-> Loaded at every Claude Code session start. This file teaches secure-by-default coding patterns so vulnerabilities are prevented at write time, not caught at review time. It is constitutional: rules here override convenience and apply to every file Claude writes or edits, in every project.
+> Loaded at every Claude Code session start. This file makes vulnerabilities *unwritable* rather than merely reviewable. It is constitutional: rules here override convenience and apply to every file Claude writes or edits, in every project.
+>
+> **What this file is NOT.** It is not a re-teaching of the OWASP Top 10, the CWE Top 25, or per-language secure-coding idioms. A current model already applies those unprompted — parameterized queries, `execFile` over shell, `argon2id`, `secrets.token_bytes`, no `alg:none`, `SafeLoader`, TLS verification. Reciting that catalog here would dilute the rules that genuinely change behavior. If you need the catalog, it is at the reference URLs at the bottom; assume you know it and act on it by default.
+>
+> **What this file IS.** The four things a capable model does *not* do reliably without being told, because they are coordination, discipline, or judgment rather than recall:
+> 1. the **deterministic-gate contract** — how to write so you cooperate with the hooks that block secrets, instead of fighting them;
+> 2. the **adversarial pre-mortem discipline** — anticipating what the red team will find and pre-closing it as testable criteria, *before* review;
+> 3. the **agentic / LLM-in-trust-path invariants** — the failure class that dominates modern systems and that no amount of web-app hygiene covers;
+> 4. the **forcing functions** — the rules that make security win over aesthetics and make exceptions auditable instead of silent.
 
-This is the first layer of a four-layer shift-left model:
+## The shift-left model this file anchors
 
-1. **Teach** (this file + SessionStart hook) — secure coding context loaded before the first user prompt.
-2. **Design** (ThreatModel skill at PRD/PLAN time) — STRIDE/MAESTRO threat modeling before any code is written.
-3. **Write** (PreToolUse `VulnPatternHook` + PostToolUse `SAST` with regenerate-loop) — IDE-style feedback during code generation.
-4. **Review** (existing review tooling — security-review, pr-review-toolkit, RedTeam, vendor SAST) — backstop, not primary defense.
+1. **Teach** (this file, SessionStart) — the discipline and coordination context below, loaded before the first prompt.
+2. **Design** (ThreatModel skill at PLAN) — STRIDE/MAESTRO enumerate, `AdversarialPreMortem` chains and pre-closes. In a PAI/Algorithm install this is a **hard gate**: ThreatModel is mandatory at PLAN for E3+ coding tasks, so at E3+ the design-time pass is not optional and this file's role is to make NATIVE/E1–E2 work reach for it too.
+3. **Write** (deterministic PreToolUse gate + PostToolUse SAST) — a literal-secret gate hard-blocks; dangerous patterns and SAST findings advise a rewrite. *(In a PAI install a second PAI-native PreToolUse gate may also run; write to satisfy both — see the gate contract below.)*
+4. **Review** (existing tooling — security-review, RedTeam, vendor SAST) — the backstop, not the primary defense. If Layers 1–3 did their job, review attacks declared residuals instead of rediscovering the base rate.
 
 If a rule below conflicts with an aesthetic preference or "cleaner code" instinct, the security rule wins. Mitigations may be skipped only when an explicit threat-model decision in the project's PRD records the rationale.
 
-## Universal rules — apply in every language
+## The forcing functions (anti-fragile core — these do not get smarter for free)
 
-1. **Never commit literal secrets to source.** Tokens, API keys, private keys, passwords, signing secrets, database URLs with embedded credentials — all read from environment variables, secret managers, or keychain at runtime. If you see a literal secret about to be written, stop and load it from `process.env.X` / `os.getenv("X")` instead.
-2. **Never trust user input.** Validate at the boundary, sanitize on output. Use type-narrowing parsers (zod, pydantic, marshmallow), not handwritten regex chains. Whitelist > blacklist.
-3. **Never concatenate or interpolate user input into queries, commands, or paths.** Always use parameter binding for SQL. Always use array-form `spawn`/`subprocess.run` (no shell). Always normalize paths with `path.resolve` and check the result is inside an allowed root.
-4. **Never trust the network.** TLS 1.2+ for everything. Verify certificates. Pin where possible. No mixed content. No `verify=False` / `rejectUnauthorized: false` in production code.
-5. **Never log sensitive data.** Tokens, passwords, raw user PII, full request/response bodies — redact or omit. Server logs are an attacker's first stop.
-6. **Never hand-roll crypto.** Use `bcrypt`/`argon2id` for passwords. Use library AES-GCM or libsodium for encryption. Use `crypto.randomBytes`/`secrets.token_bytes` for tokens. Never use `Math.random()` or `random.random()` for security purposes. Never use MD5 or SHA1 for password hashing or any signing.
-7. **Default deny.** Require explicit allow for every cross-tenant, cross-user, cross-resource access. RBAC or RLS, not "filter in the client."
-8. **Fail closed on security checks, fail open on observability.** A failed authorization check denies the request. A failed metrics push proceeds.
-9. **Least privilege at every layer.** Service accounts get only the resources they need. Database users get only the tables they need. File system processes get only the paths they need.
-10. **Patch supply chain regularly.** Pin versions in lockfiles. Run `npm audit` / `pip-audit` / `cargo audit` before commits to public projects. Use Dependabot or Renovate.
+1. **Never write a literal secret.** Tokens, API keys, private keys, passwords, signing secrets, DB URLs with embedded credentials — always `process.env.X` / `os.getenv("X")` / secret manager / keychain at runtime. This is not advice, it is a hard gate (Layer 3): a literal secret in a diff is *blocked*, not flagged. Write it as an env read the first time and you never hit the wall.
+2. **Exceptions are ISCs, never silent.** When a mitigation genuinely must be skipped, encode it as an `Anti:` ISC in the PRD that documents *what* is not done and *why it is safe* — e.g. `Anti: this endpoint accepts raw HTML because it renders in a sandboxed origin (see Decision D-N)`. A silent skip is invisible to review; an Anti-ISC is auditable and testable.
+3. **Surface the tradeoff — never silently pick a side.** If a security decision is unclear, surface it explicitly to the user with the tradeoff named (e.g., "we can do X for stronger isolation but it adds 200ms latency on every request — your call"). Don't silently choose the less-secure path. Don't silently choose the more-secure-but-impractical path either. Make the tradeoff visible.
+4. **Security requirements are ISCs the verify layer can check.** A threat you cannot state as a tool-verifiable criterion is a threat you cannot prove you closed. Every security decision that matters becomes a `- [ ] ISC-N:` with a named probe (`SecurityISCs.md` does the translation). This is the whole shift-left payoff: the SAST and review layers can only confirm what was written as a checkable claim.
 
-## OWASP Top 10:2025 — what to prevent
+## Agentic / LLM-in-trust-path — FIRST-CLASS, not an appendix
 
-Source: <https://owasp.org/Top10/>
+Most systems worth attacking now have a model in the trust path. Web-app hygiene does not cover this failure class; these invariants do. When the code under construction is an agent, skill, hook, MCP server, or any LLM with tools, these are the dominant risks — treat them the way you treat SQL injection on a web form.
 
-| Code | Category | Default mitigation pattern |
-|------|----------|---------------------------|
-| A01 | Broken Access Control | Deny-by-default authorization. Server-side checks on every endpoint. Object-level authorization (the user owns this row). |
-| A02 | Cryptographic Failures | TLS in transit, AES-GCM at rest. Never homemade crypto. Modern KDFs (argon2id, bcrypt). |
-| A03 | Injection | Parameterized queries. Output encoding by context (HTML/JS/CSS/URL). Strict input validators. |
-| A04 | Insecure Design | Threat model at PRD time (use the ThreatModel skill). Document trust boundaries. |
-| A05 | Security Misconfiguration | Secure defaults. Strip default creds. Minimize attack surface (no debug endpoints in prod). |
-| A06 | Vulnerable & Outdated Components | Lockfiles, automated upgrades, vulnerability scanning, prompt patching SLAs. |
-| A07 | Identification & Authentication Failures | MFA where possible. Server-side session invalidation on logout. Rate limit auth endpoints. |
-| A08 | Software & Data Integrity Failures | Signed packages. SRI for CDN scripts. Verify webhook signatures. |
-| A09 | Security Logging & Monitoring Failures | Log auth events. Don't log secrets. Centralize logs. Alert on anomalies. |
-| A10 | Server-Side Request Forgery (SSRF) | Disallow user-supplied URLs without an allowlist. Block private IPs and metadata endpoints (169.254.169.254). |
+- **The lethal trifecta (and the split trifecta).** An agent flow is exploitable by *indirect* prompt injection by construction if it holds all three of: **(a)** access to private data, **(b)** exposure to untrusted content (user text, tickets, attachments, retrieved docs, tool results, memory/KB), **(c)** an egress channel. Egress is not just a `send` tool — it is a markdown image the client fetches, a DNS lookup, an error string returned to the attacker, or **a write of untrusted content into a persistent store** (memory, KB, vector index, cache) that a later privileged turn reads as trusted. Compute the trifecta over the **whole request flow** — across turns, sessions, principals, and agents — not one turn: the 2026 flagship breach is the *split* trifecta (an attacker turn poisons the KB with no data-read and no egress, a later victim turn completes the exfiltration). Break the trifecta at design time: tenant-bind data tools, separate planning from execution (dual-LLM / CaMeL) so untrusted content cannot originate a tool call, allow-list egress, and provenance-tag ingested content so taint survives persistence.
+- **Tool-call arguments come from the plan, never from the content.** The arguments to a state-changing tool must derive from the typed plan built from the *authenticated user's request*, never from retrieved, attachment, or memory text. This single invariant severs most injection→action chains.
+- **Model output is untrusted input.** Never `eval`/`exec`/`Function()`/shell/SQL a string the model produced without validating it at the sink exactly as you would validate a user's. Generated code is untrusted until a sandbox or a validator says otherwise.
+- **MCP / tool supply chain.** Pin tool and MCP versions; verify tool schemas have not changed (a rug-pull tool update or a poisoned tool *description* is a confused-deputy vector). Treat a remote tool description as untrusted content that reaches the model. Do not grant an agent a capability class it does not need — excessive agency is the amplifier on every other bug.
+- **Slopsquatting / hallucinated dependencies.** The model is itself a supply-chain vector: before adding a package, confirm it exists and is the canonical name — attackers register the plausible-but-fake names models invent. Pin GitHub Actions by SHA, not tag.
+- **Never put a secret in model context.** Reference secrets by handle; resolve them server-side at tool dispatch. A secret in the context is one prompt-injection away from exfiltration.
 
-## CWE Top 25 (2024) — most dangerous weaknesses
+## Adversarial pre-mortem — write the RedTeam's report before they do
 
-Source: <https://cwe.mitre.org/top25/>
+The cheapest place to kill a vulnerability is before it is written. For any new surface, do not wait for review — assume the red team's report is already on your desk and pre-close its base rate. On **every new endpoint, route, tool, or parser**, default-assume and write the closing ISC for:
 
-The top 10 to eliminate first:
+- **IDOR / BOLA** on every object-scoped endpoint — authorize by the session-derived owner/tenant id, never by an id from input.
+- **Missing authorization** on every new route and every new agent tool — default deny, explicit allow.
+- **Injection** at every parser — SQL, shell, template, path, and for agents, prompt and *indirect* prompt.
+- **Replay / concurrency (the SEAM class)** on every state-changing or money-moving op — idempotent on a client key, serialization-safe; prove it with a *concurrent and replayed* probe, not a serial one. A control that passes serially and fails under a single-packet race is a false green.
+- **Trifecta presence** on every new agent tool grant, per the section above.
 
-| Rank | CWE | Name | Pattern to avoid |
-|------|-----|------|------------------|
-| 1 | CWE-79 | Cross-site Scripting | Unescaped user content in HTML. Use auto-escaping templates. |
-| 2 | CWE-787 | Out-of-bounds Write | C/C++ buffer ops; use safe wrappers, bounds checks. |
-| 3 | CWE-89 | SQL Injection | String-built queries. Use parameter binding always. |
-| 4 | CWE-352 | Cross-Site Request Forgery | State-changing GETs. Use POST + CSRF tokens or SameSite=Strict cookies. |
-| 5 | CWE-22 | Path Traversal | User-supplied paths. Resolve and check inside allowed root. |
-| 6 | CWE-125 | Out-of-bounds Read | Missing length checks on user-supplied indices. |
-| 7 | CWE-78 | OS Command Injection | `shell=True`, `eval`, `exec`, `system()` with user input. Use array-form invocation. |
-| 8 | CWE-416 | Use After Free | Freed pointer access. Modern ownership models (Rust, RAII C++). |
-| 9 | CWE-862 | Missing Authorization | Endpoint with no auth check. Default-deny middleware. |
-| 10 | CWE-434 | Unrestricted File Upload | Trust client-supplied content-type. Validate magic bytes; constrain size and storage location. |
+Then chain them: three "Low" issues that individually look mitigated often compose into one Critical path (leak → IDOR → token → cross-tenant). At E3+ the `AdversarialPreMortem` workflow does this composition and ranking; at any tier, the habit is the same — think in the attacker's chain to the crown jewel, and write the one choke-point ISC that severs it.
 
-Full list and translations to language-specific patterns at the source URL.
+## Threat-class salience index (a prime, not a lesson)
 
-## OWASP Agentic Skills Top 10 (AST10, 2026) — for AI agents
+You know the mitigation for every class below — this list is not teaching it. Its
+one job is *salience*: attackers exploit the class you didn't think to consider,
+so run this index against every new surface as a checklist of what to *consider*,
+then apply the mitigation you already know. One line per class, on purpose.
 
-Source: <https://owasp.org/www-project-agentic-skills-top-10/>
+- **Access control** — IDOR/BOLA, missing function-level authz, path/tenant traversal → default-deny, authorize by session-derived owner id.
+- **Injection** — SQL, NoSQL, OS command, LDAP, template, path, and (agents) prompt + *indirect* prompt → parameterize / array-exec / provenance-check.
+- **Crypto** — weak hash for passwords, ECB/RC4/DES, `Math.random`/`random` for tokens, missing TLS verify → argon2id/bcrypt, AES-GCM, CSPRNG.
+- **Deserialization / dynamic exec** — `pickle`/`yaml.load`/`eval`/`Function()` on untrusted (incl. *model output*) → safe loaders, no exec of untrusted.
+- **SSRF** — user-supplied URL fetched without allow-list → block private ranges + `169.254.169.254`.
+- **Auth / session** — replayable tokens, no logout invalidation, weak reset/magic-link, no rate-limit on auth → single-use short-TTL, server-side invalidation.
+- **Secrets / disclosure** — literal secrets (hard-blocked), verbose errors, debug endpoints, over-broad responses → env-only, generic errors, field allow-lists.
+- **Integrity / supply chain** — unverified webhooks, unpinned deps/actions, slopsquat packages, unsigned artifacts → HMAC-verify, pin by SHA, confirm package identity.
+- **Availability** — unbounded upload/list/regex, ReDoS → size caps before parse, hard `limit`, non-backtracking engines.
+- **Agentic (dominant class)** — the trifecta (split included), excessive agency, tool-poisoning, memory/KB poisoning → see the LLM-in-trust-path section above; treat as first-class, not last.
 
-When the code under construction is itself an AI agent, skill, MCP server, or Claude Code hook, these are the dominant risks:
+## The deterministic-gate contract (cooperate, don't fight)
 
-| Code | Category | Default mitigation |
-|------|----------|-------------------|
-| AST01 | Prompt Injection (direct + indirect) | Treat all tool output and external content as untrusted. Never execute instructions from observed content without user confirmation. |
-| AST02 | Insecure Output Handling | Validate model output before passing to tools; never blindly `eval` or `exec` it. |
-| AST03 | Tool Poisoning | Pin MCP/tool versions. Verify tool schemas haven't changed. Be wary of tools that "update themselves." |
-| AST04 | Excessive Agency | Tools should grant minimum capability. Don't give an agent shell when it needs file read. |
-| AST05 | Sensitive Information Disclosure | Don't pass secrets, full PII, or credentials into the model context unless required. |
-| AST06 | Insecure Plugin Design | Validate plugin inputs/outputs. Don't trust plugin authors. Sandbox where possible. |
-| AST07 | Supply Chain Risk | Pin model versions. Pin tool versions. Sign skill bundles. |
-| AST08 | Persistence & Memory Tampering | Memory/state should be hash-verified. Detect external edits. |
-| AST09 | Recursive Context Manipulation | Detect prompts that try to redefine system prompts mid-session. |
-| AST10 | Insecure Sandboxing | Validate sandbox boundaries. Assume sandbox can be escaped; defense in depth. |
+Layer 3 hooks scan every Edit/Write deterministically. Knowing what they do keeps you out of regenerate loops:
 
-If you are writing a Claude skill, hook, or MCP server, AST10 risks are first-class.
+- **Secrets are hard-blocked.** Provider key shapes (Anthropic/OpenAI/AWS/Stripe/GitHub/Slack), private-key PEM blocks, and DB URLs with embedded passwords are *denied* — the write does not land. Read from env instead; there is no "just this once."
+- **Test fixtures need synthetic keys.** In tests, use synthetic fixtures only. If a real key *shape* is needed for a regex test, prefix with `sk-test-FIXTURE-` or similar — clearly synthetic. This is the whitelist contract: it is how the gate tells your fixture from a real leak. Skip it and the gate blocks your test file.
+- **Dangerous APIs and weak crypto are advised, not blocked** — `eval`, `shell=True`, `yaml.load` without `SafeLoader`, `innerHTML` with user text, MD5/SHA1 on passwords, `Math.random()`/`random.random()` for tokens. You already avoid these; the advisory exists for drift. If a flagged pattern is genuinely correct, suppress that one line with `// nosec: <rule_id> — <reason>` (or `# nosec:`), which records the justification inline.
 
-## Per-language guidance
+## When to reach for the ThreatModel skill
 
-### TypeScript / JavaScript
+At E3+ this is a hard gate, so this list is really for **NATIVE / E1–E2** work — reach for `ThreatModel` (and its `AdversarialPreMortem` pass) whenever the change touches: authentication, authorization, sessions, or identity; payments or anything of monetary value; a new external integration (third-party API, OAuth, webhook); a new trust boundary (service, tenant, role); a new persistence path for user data (upload, table, bucket, export); or a new agentic capability (an LLM gets a new tool, an MCP server is added). Don't try to hold the whole catalog in your head — invoke the skill and let the workflow surface the threats.
 
-1. **Database access** — use a parameterizing client (`pg`, Prisma, Drizzle, knex with `.where()`). Never template-literal a query: `` `SELECT * FROM users WHERE id = ${id}` `` is broken even if `id` "looks like a number."
-2. **Shell commands** — `child_process.execFile(cmd, [args])`, never `child_process.exec(cmdString)`. If you must `exec`, accept it as an `Anti:` ISC and document why.
-3. **`eval`, `Function(...)`, `setTimeout(string)`, `setInterval(string)`, `vm.runInThisContext`** — banned in user-input paths. If used for templating, isolate to compile-time inputs only.
-4. **DOM injection** — `element.innerHTML = userText` is broken. Use `textContent` or DOMPurify with a strict allowlist.
-5. **Cookies** — `Secure; HttpOnly; SameSite=Strict` (or `Lax` if cross-site links must work). Set `__Host-` prefix for session cookies.
-6. **JWT** — verify signature with the algorithm pinned (`{algorithms: ['HS256']}`); never accept `alg: none`. Validate `exp`, `iss`, `aud`. Rotate secrets.
-7. **Crypto random** — `crypto.randomBytes(n).toString('hex')` for tokens. `Math.random()` is for graphics, never security.
-8. **Dependencies** — `npm audit`, `pnpm audit`. Run before every release. Lock with `package-lock.json` / `pnpm-lock.yaml`.
+## Secrets handling — the operational rules
 
-### Python
+- **In code:** env / secret manager / keychain. Never literal (hard-blocked — see the gate contract).
+- **In tests:** synthetic `sk-test-FIXTURE-…` shapes only.
+- **In `.env`:** gitignored; ship `.env.example` with placeholders.
+- **In logs:** redact (`Authorization: Bearer [REDACTED]`); never full bodies or raw PII.
+- **In history:** a secret ever committed is compromised — rotate it; removing the file does not undo history (`git filter-repo` + rotate).
 
-1. **Database access** — `cursor.execute("SELECT ... WHERE id = %s", (id,))` (psycopg, mysqlclient). SQLAlchemy core/ORM. Never `.execute(f"SELECT ... {id}")`.
-2. **Shell commands** — `subprocess.run([cmd, arg1, arg2], check=True)`, never `subprocess.run(cmdStr, shell=True)`.
-3. **Deserialization** — `pickle.loads`, `marshal.loads`, `yaml.load` (without `SafeLoader`), `dill` — all banned on untrusted data. Use `json` or `yaml.safe_load`.
-4. **Path traversal** — `path = pathlib.Path(root).joinpath(user_path).resolve(); assert path.is_relative_to(root)`.
-5. **`eval`, `exec`, `compile`** — banned on user input. If a dynamic-evaluation pattern looks needed, redesign.
-6. **Secrets in env** — `os.environ["X"]` (raises if missing) or `os.getenv("X")` (returns None). Use `python-dotenv` for local dev. `pydantic-settings` for typed config.
-7. **Password hashing** — `argon2-cffi` or `bcrypt`. Never `hashlib.md5(password)` or `hashlib.sha256(password)`. Constant-time compare with `hmac.compare_digest`.
-8. **Crypto random** — `secrets.token_bytes`, `secrets.token_urlsafe`, `secrets.choice`. Never `random.random()` for security.
-9. **HTTP requests** — verify TLS by default (`requests` and `httpx` do; don't override). Pin certificates for high-stakes integrations.
-10. **Dependencies** — `pip-audit` before release. Lock with `pip-tools` or `poetry`/`uv`.
-
-### Bash
-
-1. **Always set strict mode** — `set -euo pipefail` at the top of every script. `IFS=$'\n\t'` if word splitting matters.
-2. **Always quote variables** — `"$VAR"`, never bare `$VAR`. Bare expansion enables injection on any whitespace.
-3. **`eval`** — banned. If you find yourself reaching for it, redesign.
-4. **`bash -c "$VAR"` / `sh -c "$VAR"`** — banned with user input. Use array-form invocation: `cmd "$@"`.
-5. **`curl | sh` and `wget | bash`** — banned. Verify checksums; review before executing.
-6. **`rm -rf "$VAR"`** — wrap with sanity check: ensure the path exists, is owned by the running user, and is inside an expected root.
-7. **Tempfile creation** — `mktemp` (creates unique file with safe permissions). Never `/tmp/myapp_$$`.
-8. **Sourced files** — only source files you control. Sourcing a tampered file is RCE.
-
-### SQL
-
-1. **Parameterized only.** No string concatenation, no f-strings, no `format()`, no string interpolation. Even on numeric inputs.
-2. **Least-privilege DB user.** Application connects as a role that has only the privileges it needs (no `DROP`, no `CREATE` outside migrations).
-3. **Audit destructive ops in migrations.** `DROP TABLE`, `TRUNCATE`, `DELETE` without a `WHERE` — explicitly review and approve in the migration PR.
-4. **Soft delete by default for user data.** Hard delete via a separate, audited path.
-5. **Foreign keys with `ON DELETE` rules thought through.** `CASCADE` is convenient and dangerous; prefer `RESTRICT` unless the cascade is explicitly desired.
-6. **Indexes on foreign keys.** Otherwise lookups silently scan.
-
-## Secrets handling — universal
-
-- **In code:** read from environment, secret manager (AWS Secrets Manager, GCP Secret Manager, Vault, Doppler), or local keychain. Never literal.
-- **In tests:** synthetic test fixtures only. If a real key shape is needed for a regex test, prefix with `sk-test-FIXTURE-` or similar — clearly synthetic.
-- **In .env files:** `.env` is in `.gitignore`. `.env.example` lives in the repo with placeholder values.
-- **In logs:** redact. `auth: Bearer [REDACTED]`. PII fields likewise.
-- **In commits:** if a real secret was ever committed, rotate it. Removing the file does not undo the commit history. Use `git filter-repo` and rotate the secret in source.
-
-## Authentication & session management
-
-1. **Hash passwords with `argon2id` (preferred) or `bcrypt` cost ≥12.** Never store reversibly.
-2. **Rate limit auth endpoints** — login, signup, password-reset, MFA. Per-IP and per-account.
-3. **Short-lived access tokens, longer-lived refresh tokens.** Both stored in `__Host-` HttpOnly Secure cookies (web) or platform secure storage (mobile).
-4. **Server-side session invalidation on logout.** Maintain a blacklist or short-TTL access tokens with refresh rotation.
-5. **MFA** — TOTP (RFC 6238) is the baseline; WebAuthn/FIDO2 where users will tolerate it. SMS is last resort.
-6. **Magic-link auth** — single-use, short TTL (10-15 min), rate-limited, IP-bound where feasible.
-7. **OAuth/OIDC** — verify `state`, `nonce`, `iss`. Use libraries (`openid-client`, `authlib`); don't hand-roll.
-
-## Authorization
-
-1. **RBAC at minimum, ABAC where richer policy is needed.** Encode in middleware, not scattered through handlers.
-2. **Object-level authorization** — every read/write checks `does this user own/have access to this object?` at the data layer. Postgres RLS is a strong default.
-3. **Default-deny.** Routes without an explicit permission check should not be reachable.
-4. **No privilege escalation by ID guessing** — UUIDv4 or ULID for resource IDs (not sequential integers).
-
-## Input validation & output encoding
-
-1. **Validate at the boundary** — every API endpoint, every form, every queue handler. Use a typed parser (zod / pydantic / marshmallow / valibot).
-2. **Encode at the sink** — HTML, JS, URL, CSS, SQL parameter, shell argument — encoder per context.
-3. **Schema for everything that crosses a process boundary** — JSON Schema, OpenAPI, protobuf.
-4. **Reject early, generously** — short error messages without leaking internals (`"invalid input"`, not `"id 17 not found in users table"`).
-
-## Logging & observability
-
-1. **Log auth events** — sign-in success/failure, password reset, MFA enrollment, token revocation.
-2. **Don't log secrets, full request bodies, or raw PII.** Hash or redact.
-3. **Centralize logs** — searchable, retention policy, access controls.
-4. **Alert on anomalies** — unusual login locations, brute force, mass deletes, configuration changes.
-5. **Tag log lines with request ID, session ID (hashed), user ID** — for traceability without exposure.
-
-## Dependency hygiene
-
-1. **Lockfiles in repo.** `package-lock.json`, `pnpm-lock.yaml`, `requirements.txt` with hashes, `poetry.lock`, `uv.lock`, `Cargo.lock`.
-2. **Automated upgrades** — Dependabot or Renovate, with a CI gate.
-3. **Audit before release** — `npm audit --audit-level=high`, `pip-audit`, `cargo audit`. Block release on HIGH+ unfixed.
-4. **Pin floating tags** — for Docker base images, pin to digest (`@sha256:...`), not `latest`.
-
-## When to stop and threat-model
-
-Trigger the ThreatModel skill at PRD time when any of the following apply:
-
-- New project or major feature involving authentication, authorization, payments, or user-uploaded content.
-- New external integration (third-party API, OAuth provider, webhook source).
-- New trust boundary (browser/server, server/db, server/external, on-prem/cloud).
-- New persistence of user data, especially PII or payment data.
-- New AI-agent capability — invoke the MAESTRO workflow specifically.
-
-Don't try to remember everything below — invoke the skill and let the structured workflow surface the threats.
-
-## When you're stuck
-
-If a security decision is unclear, surface it explicitly to the user with the tradeoff named (e.g., "we can do X for stronger isolation but it adds 200ms latency on every request — your call"). Don't silently choose the less-secure path. Don't silently choose the more-secure-but-impractical path either. Make the tradeoff visible.
-
-## References
+## References (for the human — assume the model already knows these)
 
 - OWASP Top 10:2025 — <https://owasp.org/Top10/>
 - CWE Top 25 (2024) — <https://cwe.mitre.org/top25/>
 - OWASP Agentic Skills Top 10 (AST10, 2026) — <https://owasp.org/www-project-agentic-skills-top-10/>
 - OWASP ASVS 5.0 — <https://owasp.org/www-project-application-security-verification-standard/>
-- SEI CERT Secure Coding Standards — <https://wiki.sei.cmu.edu/confluence/display/seccode>
-- NIST Secure Software Development Framework (SSDF) — <https://csrc.nist.gov/Projects/ssdf>
-- Mozilla Web Security Cheat Sheet — <https://infosec.mozilla.org/guidelines/web_security>
+- CSA MAESTRO (agentic threat modeling, 2025) — <https://cloudsecurityalliance.org/blog/2025/02/06/agentic-ai-threat-modeling-framework-maestro>
+- The "lethal trifecta" — <https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/>
 - OWASP Cheat Sheet Series — <https://cheatsheetseries.owasp.org/>
-- CSA MAESTRO (Agentic AI threat modeling, 2025) — <https://cloudsecurityalliance.org/blog/2025/02/06/agentic-ai-threat-modeling-framework-maestro>

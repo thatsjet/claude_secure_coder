@@ -31,7 +31,7 @@ Mature security organizations work this way:
 
 ## Layer 2 — Design (ThreatModel skill)
 
-`skills/ThreatModel/` is a Claude Code skill with five workflows:
+`skills/ThreatModel/` is a Claude Code skill with six workflows:
 
 | Workflow | When | Output |
 |----------|------|--------|
@@ -39,11 +39,14 @@ Mature security organizations work this way:
 | **MAESTRO** | Agentic AI / Claude Code skills / MCP servers | Layer-by-layer threat table, ISCs |
 | **DataFlowDiagram** | Visualize trust boundaries | Mermaid DFD + boundary table |
 | **AbuseCases** | Generate misuse stories from user stories | Misuse story list with defense ISCs |
+| **AdversarialPreMortem** | After enumeration, before finalizing ISCs | Ranked attack chains (entry→pivot→escalation→impact) + choke-point ISCs |
 | **SecurityISCs** | Convert threat list into atomic ISCs | ISC list ready to paste into PRD `## Criteria` |
+
+The first four and `SecurityISCs` *enumerate and translate*; `AdversarialPreMortem` is the *synthesis* pass — it composes the enumerated atoms into the two or three kill chains a red team actually walks and writes the one ISC that severs each, so review attacks declared residuals instead of rediscovering the base rate.
 
 **When to invoke:** at PRD/PLAN time, before any code is written. The skill produces text the calling code pastes into the PRD's security section.
 
-**Auto-include (PAI users):** Algorithm v6.4.0 doctrine adds ThreatModel to the closed-enumeration thinking-capability list and auto-includes it at PLAN for E3+ coding tasks. Silas additionally auto-includes at PLAN for E4+.
+**Auto-include (PAI users):** current Algorithm doctrine (`capabilities.md`) makes ThreatModel **mandatory at PLAN for E3+** coding tasks — a hard gate, not just an auto-include. *(The original patch targeted Algorithm v6.4.0 and referenced the since-retired Silas/Cato agents; see `docs/relevance-review.md` for the patch-refresh follow-up.)*
 
 ## Layer 3 — Write (PreToolUse + PostToolUse hooks)
 
